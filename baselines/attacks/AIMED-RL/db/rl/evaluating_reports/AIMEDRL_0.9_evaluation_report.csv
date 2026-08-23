@@ -1,0 +1,10 @@
+name,seed,save_report,save_agent,malware_path,recursive_data,episodes,detection_model,detection_model_path,threshold,save_ae_dir,save_train_aes,save_eval_aes,max_turns,strategy_reset,strategy_inject,maximum_reward,weights,reward_punishment,agent,optimizer,adam_epsilon,dqn_gamma,dqn_replay_start_size,replay_buffer,replay_buffer_capacity,dqn_hidden_size,explorer,epsilon_greedy_start_epsilon,epsilon_greedy_end_epsilon,epsilon_greedy_decay_steps,boltzmann_temperature,replay_start_size,minibatch_size,batch_accumulator,update_interval,target_update_interval
+AIMEDRL,1234,db/rl/,samples/rl/agent/,Adv_agent,True,1500,EMBER,LIGHTGBMs/result.txt,0.9,samples/rl/adversarial_examples/,False,True,10,True,False,10,"[0.33, 0.33, 0.33]",True,ALGO_DISTDQN,ADAM_OPTIMIZER,0.01,0.95,32,PRIORITIZED_REPLAY_BUFFER,1000,"[64, 16]",NOISY_NETS,1.0,0.05,100,1.0,32,32,mean,1,100
+
+Average Q: 8.237719166307869
+Average Loss: 0
+Number Updates Agent: 14791
+Preferred Action Vector: ['imports_append']
+Total Time: 01:03:27
+Number adversarial samples: 36
+Number errored: 4
