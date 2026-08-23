@@ -1,0 +1,27 @@
+torch
+PyYAML
+numpy<2.0
+gymnasium
+lief>=0.17.4
+# NOTE: angr is NOT compatible with Python 3.14.
+# CFG extraction (worker_angr.py) will be skipped automatically
+# if angr cannot be imported. The rest of the pipeline all work fine.
+# To get angr working, use Python 3.10 or 3.11.
+angr==9.2.213
+capstone>=5.0.0
+keystone-engine
+pefile
+pwntools
+scikit-learn
+pandas
+tensorboard
+tqdm
+redis
+requests
+paramiko
+pyzipper
+torchvision
+opencv-python
+pybind11
+triton-library
+z3-solver

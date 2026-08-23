@@ -1,0 +1,55 @@
+# ==========================================
+# SENSITIVE DATA — NEVER PUSH TO REMOTE
+# ==========================================
+malware_rl_system/config/
+*.pth
+*.pt
+
+# ==========================================
+# PYTHON VIRTUAL ENVIRONMENT
+# ==========================================
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.so
+build/
+dist/
+
+# ==========================================
+# REDIS DATA & LOGS
+# ==========================================
+malware_rl_system/redis-stable/
+malware_rl_system/redis-stable.tar.gz
+malware_rl_system/redis_data/
+*.rdb
+*.aof
+
+# ==========================================
+# OUTPUT REPORTS
+# ==========================================
+*_report.json
+overall_report.json
+
+# ==========================================
+# WORKSPACE / TEMP
+# ==========================================
+binsim_progress/
+binsim_slices/
+*.npz
+*.log
+
+# ==========================================
+# OS & EDITOR
+# ==========================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+*.pdf
+tmp/

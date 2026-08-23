@@ -1,0 +1,47 @@
+# Parallel evaluation config for run_002 shard_3.
+
+dataset:
+  malware_root: data/dataset/Test_shards/run_002_resumed/shard_3
+  families: [Locker, Mediyes, Winwebsec, Zbot, Zeroaccess]
+
+precomputed:
+  cr_exe_dir: data/precomputed/test/code-randomize/exe
+  ct_exe_dir: data/precomputed/test/code-translation/exe
+
+env:
+  max_steps: 5
+  function_threshold: 80.0
+
+sandbox:
+  timeout_full: 1800
+  poll_interval: 2.0
+
+agent:
+  num_actions: 19
+  num_atoms: 51
+  v_min: -500.0
+  v_max: 200.0
+  sigma_init: 0.5
+  gamma: 0.99
+  lr: 1.0e-4
+  adam_eps: 1.5e-4
+  grad_clip: 10.0
+  device: cpu
+  per:
+    capacity: 10000
+    alpha: 0.6
+    beta: 0.4
+    beta_increment: 0.001
+    epsilon: 1.0e-5
+  target_sync_steps: 1000
+
+train:
+  seed: 1337
+
+test:
+  checkpoint: models/checkpoints/run_002/final.pt
+  output_dir: outputs/aes_test_run_002_parallel
+  greedy: true
+  episodes: all
+  save_aes: true
+  save_traces: true

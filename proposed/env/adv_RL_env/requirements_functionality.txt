@@ -1,0 +1,17 @@
+# Functionality-only environment.
+#
+# Purpose:
+#   Run malware_rl_system/evaluation/functionality_evaluator.py separately
+#   from the Torch/VERITAS environment so Triton DBA is not shadowed by
+#   PyTorch's triton compiler package.
+#
+# Install:
+#   python3 -m venv env/adv_RL_env/func_venv
+#   env/adv_RL_env/func_venv/bin/python -m pip install -r env/adv_RL_env/requirements_functionality.txt
+#   env/adv_RL_env/func_venv/bin/python -m pip install ./env/adv_RL_env/examples/comparing_apis
+
+redis
+numpy<2.0
+pybind11
+z3-solver
+triton-library
