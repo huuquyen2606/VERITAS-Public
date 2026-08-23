@@ -1,0 +1,14 @@
+[
+  {
+    "host": "http://<YOUR_CAPE_NODE_1_IP>:8000",
+    "ssh_host": "<YOUR_CAPE_NODE_1_IP>",
+    "ssh_user": "cape",
+    "ssh_pass": "<YOUR_SSH_PASSWORD>"
+  },
+  {
+    "host": "http://<YOUR_CAPE_NODE_2_IP>:8000",
+    "ssh_host": "<YOUR_CAPE_NODE_2_IP>",
+    "ssh_user": "cape",
+    "ssh_pass": "<YOUR_SSH_PASSWORD>"
+  }
+]

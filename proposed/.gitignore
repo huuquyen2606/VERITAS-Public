@@ -1,0 +1,21 @@
+.agents/
+.codex/
+venv/
+__pycache__/
+*.pyc
+func_venv/
+**/func_venv/
+*.log
+
+data/**
+!data/**/
+!data/**/.gitkeep
+
+outputs/**
+!outputs/**/
+!outputs/**/*.json
+
+# Exclude large intermediate checkpoints, keep only final and best
+models/checkpoints/run_001/
+models/checkpoints/run_002/episode_*.pt
+models/checkpoints/run_002_resumed_500/
