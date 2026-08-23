@@ -1,0 +1,17 @@
+=== Gradient Boosting Evaluation Report ===
+ROC-AUC: 0.9999
+
+At ~1% FPR:
+  Threshold: 0.9867
+  FPR: 0.0153
+  TPR: 0.9961
+
+Classification Report (Threshold = 0.9):
+              precision    recall  f1-score   support
+
+      benign       0.97      0.98      0.98       196
+     malware       1.00      1.00      1.00      1794
+
+    accuracy                           1.00      1990
+   macro avg       0.99      0.99      0.99      1990
+weighted avg       1.00      1.00      1.00      1990

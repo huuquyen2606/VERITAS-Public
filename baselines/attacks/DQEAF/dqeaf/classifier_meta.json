@@ -1,0 +1,5 @@
+{
+  "classifier_type": "sklearn_ember_v1_2350",
+  "model_file": "independent_classifier_sklearn_ember.pkl",
+  "threshold": 0.9
+}
