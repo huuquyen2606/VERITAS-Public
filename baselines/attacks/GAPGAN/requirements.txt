@@ -1,0 +1,8 @@
+# GAPGAN - Python Dependencies
+# Paper: "Black-box Adversarial Attacks Against Deep Learning Based
+#         Malware Binaries Detection with GAN" (ECAI 2020)
+#
+# Install: pip install -r requirements.txt
+
+torch>=1.9.0,<2.5.0
+numpy>=1.21.0,<2.0.0
