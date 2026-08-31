@@ -1,0 +1,163 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models
+
+# ============================================================================
+# 1. ATTENTION LAYERS
+# ============================================================================
+class GlobalAttentionLayer(nn.Module):
+    """
+    Additive Global Attention applied to the LSTM sequence of API calls.
+    Paper: "In the global attention layer... learnable function is formed by performing 
+    tanh operation on the hidden sequence vectors... applying softmax... weighted average".
+    """
+    def __init__(self, hidden_dim, attention_dim=128):
+        super(GlobalAttentionLayer, self).__init__()
+        self.attention_fc = nn.Linear(hidden_dim, attention_dim)
+        self.context_vector = nn.Linear(attention_dim, 1, bias=False)
+
+    def forward(self, lstm_output):
+        # lstm_output shape: (batch_size, seq_length, hidden_dim)
+        u = torch.tanh(self.attention_fc(lstm_output))  
+        scores = self.context_vector(u).squeeze(-1)  
+        alpha = F.softmax(scores, dim=1).unsqueeze(-1)  
+        
+        # Weighted average of the informative LSTM features
+        context = torch.sum(lstm_output * alpha, dim=1)  
+        return context
+
+class GlobalWeightedAveragePooling(nn.Module):
+    """
+    Global Weighted Average Pooling for the 2D EfficientNet branch.
+    Paper: "instead of a global average pooling, in this work global weighted average 
+    pooling is employed... introduces the weights that assign larger weight to the features".
+    """
+    def __init__(self, in_channels):
+        super(GlobalWeightedAveragePooling, self).__init__()
+        # 1x1 Conv to learn spatial weights for the feature map
+        self.weight_conv = nn.Conv2d(in_channels, 1, kernel_size=1)
+
+    def forward(self, x):
+        # x shape: (batch_size, channels, H, W)
+        batch_size, channels, h, w = x.size()
+        weights = self.weight_conv(x)  # (batch_size, 1, H, W)
+        weights = weights.view(batch_size, 1, h * w)
+        weights = F.softmax(weights, dim=-1)  # Spatial softmax
+        weights = weights.view(batch_size, 1, h, w)
+        
+        # Multiply features by weights and sum over spatial dimensions
+        weighted_x = x * weights
+        return torch.sum(weighted_x, dim=(2, 3))  # (batch_size, channels)
+
+
+# ============================================================================
+# 2. PAPER-ACCURATE MULTI-CLASS M-ATTN-HEALTH ARCHITECTURE
+# ============================================================================
+class MAttnHealthArch(nn.Module):
+    def __init__(self, num_classes=9):
+        """
+        num_classes: Defaults to 9 for the Microsoft Windows Malware dataset.
+        """
+        super(MAttnHealthArch, self).__init__()
+
+        # -------------------------------------------------------------------
+        # BRANCH 1 & 2: PE-Header and PE-Imports (DNN)
+        # -------------------------------------------------------------------
+        def create_dnn(input_dim):
+            return nn.Sequential(
+                nn.Linear(input_dim, 1000), nn.BatchNorm1d(1000), nn.ReLU(inplace=True), nn.Dropout(0.2),
+                nn.Linear(1000, 750), nn.BatchNorm1d(750), nn.ReLU(inplace=True), nn.Dropout(0.2),
+                nn.Linear(750, 500), nn.BatchNorm1d(500), nn.ReLU(inplace=True), nn.Dropout(0.2),
+                nn.Linear(500, 250), nn.BatchNorm1d(250), nn.ReLU(inplace=True), nn.Dropout(0.2),
+                nn.Linear(250, 64), nn.BatchNorm1d(64), nn.ReLU(inplace=True)
+            )
+        self.header_net = create_dnn(4)
+        self.import_net = create_dnn(1000)
+
+        # -------------------------------------------------------------------
+        # BRANCH 3: 1D PE-Image (CNN)
+        # -------------------------------------------------------------------
+        self.image_convs = nn.Sequential(
+            nn.Conv1d(1, 256, kernel_size=6, padding=2), nn.ReLU(inplace=True), nn.MaxPool1d(6),
+            nn.Conv1d(256, 128, kernel_size=6, padding=2), nn.ReLU(inplace=True), nn.MaxPool1d(6),
+            nn.Conv1d(128, 64, kernel_size=6, padding=2), nn.ReLU(inplace=True), nn.AdaptiveMaxPool1d(4),
+        )
+        self.image_fcl = nn.Sequential(
+            nn.Linear(64 * 4, 128), nn.BatchNorm1d(128), nn.ReLU(inplace=True), nn.Dropout(0.2),
+            nn.Linear(128, 64), nn.BatchNorm1d(64), nn.ReLU(inplace=True),
+        )
+
+        # -------------------------------------------------------------------
+        # BRANCH 4: 2D PE-Image (EfficientNet Feature Fusion)
+        # -------------------------------------------------------------------
+        self.eff_b0 = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
+        self.eff_b1 = models.efficientnet_b1(weights=models.EfficientNet_B1_Weights.DEFAULT)
+        self.eff_b2 = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
+        
+        # Replace the default classifiers & pooling with GWAP
+        self.eff_b0.avgpool = GlobalWeightedAveragePooling(in_channels=1280)
+        self.eff_b1.avgpool = GlobalWeightedAveragePooling(in_channels=1280)
+        self.eff_b2.avgpool = GlobalWeightedAveragePooling(in_channels=1408)
+        
+        self.eff_b0.classifier = nn.Identity()
+        self.eff_b1.classifier = nn.Identity()
+        self.eff_b2.classifier = nn.Identity()
+
+        self.feature_fusion_2d = nn.Sequential(
+            nn.Linear(3968, 768), nn.BatchNorm1d(768), nn.ReLU(inplace=True),
+            nn.Linear(768, 512), nn.BatchNorm1d(512), nn.ReLU(inplace=True),
+            nn.Linear(512, 128), nn.BatchNorm1d(128), nn.ReLU(inplace=True),
+            nn.Linear(128, 64), nn.BatchNorm1d(64), nn.ReLU(inplace=True)
+        )
+
+        # -------------------------------------------------------------------
+        # BRANCH 5: API Calls (LSTM + Global Attention)
+        # -------------------------------------------------------------------
+        self.api_lstm1 = nn.LSTM(1, 512, batch_first=True)
+        self.api_lstm2 = nn.LSTM(512, 256, batch_first=True)
+        self.api_lstm3 = nn.LSTM(256, 128, batch_first=True)
+        self.api_lstm4 = nn.LSTM(128, 64, batch_first=True)
+        self.api_attention = GlobalAttentionLayer(hidden_dim=64)
+
+        self.api_fcl = nn.Sequential(
+            nn.Linear(64, 128), nn.BatchNorm1d(128), nn.ReLU(inplace=True), nn.Dropout(0.2),
+            nn.Linear(128, 64), nn.BatchNorm1d(64), nn.ReLU(inplace=True) 
+        )
+
+        # -------------------------------------------------------------------
+        # FINAL CLASSIFICATION FUSION (MULTI-CLASS MODIFICATION)
+        # Paper: "Windows malware detection... contains 9 neurons."
+        # -------------------------------------------------------------------
+        self.classifier = nn.Sequential(
+            nn.Linear(320, 320), nn.BatchNorm1d(320), nn.ReLU(inplace=True), nn.Dropout(0.3),
+            nn.Linear(320, 256), nn.BatchNorm1d(256), nn.ReLU(inplace=True), nn.Dropout(0.3),
+            nn.Linear(256, 128), nn.BatchNorm1d(128), nn.ReLU(inplace=True), nn.Dropout(0.3),
+            nn.Linear(128, 64), nn.BatchNorm1d(64), nn.ReLU(inplace=True), nn.Dropout(0.3),
+            # Output raw logits for 'num_classes' (Softmax handled by CrossEntropyLoss)
+            nn.Linear(64, num_classes) 
+        )
+
+    def forward(self, x_header, x_import, x_img_1d, x_img_2d, x_api):
+        h_header = self.header_net(x_header)
+        
+        x_import = x_import.view(x_import.size(0), -1)
+        h_import = self.import_net(x_import)
+
+        h_img_1d = self.image_convs(x_img_1d).view(x_img_1d.size(0), -1)
+        h_img_1d = self.image_fcl(h_img_1d)
+
+        e0 = self.eff_b0(x_img_2d)
+        e1 = self.eff_b1(x_img_2d)
+        e2 = self.eff_b2(x_img_2d)
+        h_img_2d = self.feature_fusion_2d(torch.cat([e0, e1, e2], dim=1))
+
+        x_api = x_api.transpose(1, 2)
+        out, _ = self.api_lstm1(x_api)
+        out, _ = self.api_lstm2(out)
+        out, _ = self.api_lstm3(out)
+        out, _ = self.api_lstm4(out)
+        h_api = self.api_fcl(self.api_attention(out))
+
+        fused = torch.cat([h_header, h_import, h_img_1d, h_img_2d, h_api], dim=1)
+        return self.classifier(fused)
