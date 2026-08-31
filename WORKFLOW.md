@@ -3,6 +3,8 @@
 ## Overview
 This repository contains a comprehensive suite for evaluating **VERITAS**, our proposed adversarial malware technique. It covers the entire pipeline from data extraction and baseline detection to adversarial sample generation, functionality verification, and final metric calculation.
 
+> **Note on this Repository:** This repository represents a refactored, beautified, and generalized version of the codebase we used during our testing. It is provided for reference and architectural understanding, and may not represent the exact 1-to-1 code executed during all raw experimental runs.
+
 **Important Context:** The primary purpose of this repository is to showcase and evaluate our proposed technique (`proposed/`). All other adversarial techniques (`baseline_adversarial_techniques/`) and detectors (`baseline_detectors/`) are included strictly as **comparators** to establish a baseline. The miscellaneous tools (`miscs/`) and evaluating codes are helper utilities designed to set up the robust evaluation workflow.
 
 This document serves as a high-level conceptual reference for the data flow and architectural components. For specific implementation details and execution commands, please consult the `README.md` files located within each respective directory.
