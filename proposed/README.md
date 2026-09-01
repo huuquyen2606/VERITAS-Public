@@ -471,6 +471,22 @@ The system distributes sandbox analysis across 4 CAPEv2 KVM nodes using Atomic R
 ### Known Architectural Notes
 - **angr Compatibility**: `worker_angr.py` spawns a subprocess pointing to the separate `func_venv` because `angr` is incompatible with Python 3.14. 
 
+<<<<<<< HEAD
+---
+
+## Authors / Maintainers
+
+- Nguyen Huu Quyen, University of Information Technology, VNU-HCM (`quyennh@uit.edu.vn`)
+- Dinh Nguyen Tuan Dat, University of Information Technology, VNU-HCM (`25520260@gm.uit.edu.vn`)
+- Do Bach, University of Information Technology, VNU-HCM (`25520110@gm.uit.edu.vn`)
+- Van-Hau Pham, University of Information Technology, VNU-HCM (`haupv@uit.edu.vn`)
+
+Corresponding Author: **Van-Hau Pham** (`haupv@uit.edu.vn`).
+
+---
+
+=======
+>>>>>>> upstream/main
 ## License
 
 This project is licensed under the Apache License 2.0. See the `LICENSE` file for details.

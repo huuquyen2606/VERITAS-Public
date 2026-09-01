@@ -1,0 +1,12 @@
+numpy>=1.26
+scikit-learn>=1.4
+torch>=2.2
+gymnasium>=0.29
+joblib>=1.3
+# Pin lief==0.14.1: lief 0.17.x hangs indefinitely when parsing certain PE malware (upstream regression bug)
+lief==0.14.1
+lightgbm>=4.0
+tqdm
+pandas
+# Ember: install directly from repository
+git+https://github.com/elastic/ember.git

@@ -1,0 +1,2 @@
+import generate_latex_heuristics
+generate_latex_heuristics.main()

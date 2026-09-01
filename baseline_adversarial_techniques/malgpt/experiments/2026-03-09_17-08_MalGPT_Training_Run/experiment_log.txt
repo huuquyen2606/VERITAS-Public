@@ -1,0 +1,6 @@
+[17:08:40] ----------------------------------------
+[17:08:40] SESSION STARTED: 2026-03-09 17:08:40
+[17:08:40] ----------------------------------------
+[17:08:40] [*] Starting MalGPT Training Phase
+[17:08:42] [*] Loading dataset from ../original_dataset/splitted_dataset/ready_to_deploy_dataset/Extracted_dataset/Adv_full.npz
+[17:08:45] [*] Filtered 400 benign samples for training out of 3988 total files.
