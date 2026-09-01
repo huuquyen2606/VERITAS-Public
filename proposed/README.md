@@ -2,14 +2,9 @@
 
 **VERITAS: Validity-Constrained Multi-Surface Adversarial Malware Generation**
 
-Nguyen Huu Quyen, Dinh Nguyen Tuan Dat, Do Bach, Van-Hau Pham
-
-Information Security Lab, University of Information Technology, Ho Chi Minh City, Vietnam  
-Vietnam National University, Ho Chi Minh City, Vietnam
-
 VERITAS is a validity-constrained reinforcement learning framework for generating problem-space adversarial Windows Portable Executable (PE) malware. It couples broad multi-surface transformation coverage with search-time operational-validity enforcement, ensuring generated adversarial variants evade target detectors while strictly preserving functional and behavioral integrity.
 
-This repository accompanies the research paper published at the Network and Distributed System Security Symposium (NDSS 2027) and is intended to support research reproducibility.
+This repository accompanies the research paper and is intended to support research reproducibility.
 
 ---
 
@@ -476,6 +471,7 @@ The system distributes sandbox analysis across 4 CAPEv2 KVM nodes using Atomic R
 ### Known Architectural Notes
 - **angr Compatibility**: `worker_angr.py` spawns a subprocess pointing to the separate `func_venv` because `angr` is incompatible with Python 3.14. 
 
+<<<<<<< HEAD
 ---
 
 ## Authors / Maintainers
@@ -489,6 +485,8 @@ Corresponding Author: **Van-Hau Pham** (`haupv@uit.edu.vn`).
 
 ---
 
+=======
+>>>>>>> upstream/main
 ## License
 
 This project is licensed under the Apache License 2.0. See the `LICENSE` file for details.

@@ -18,9 +18,10 @@ This repository accompanies the research paper and is intended to support resear
 
 ## Paper Overview
 
-The paper formulates problem-space adversarial malware generation as malware-to-benign evasion subject to explicit operational-validity requirements. During sequential optimization, each tentative candidate is evaluated for execution viability and behavioral preservation using complementary API and low-level system-call evidence. 
+The paper formulates problem-space adversarial malware generation as malware-to-benign evasion subject to explicit operational-validity requirements. During sequential optimization, each tentative candidate is evaluated for execution viability and behavioral preservation using complementary API and low-level system-call evidence.
 
 VERITAS exposes 19 realizable actions across three complementary surfaces:
+
 - **PE structure and metadata**: headers, sections, imports, overlays, metadata, timestamps, packing.
 - **Code and control flow**: instruction rewriting, code randomization, lift-transform-recompile artifacts, call-edge redividing, semantic-NOP insertion.
 - **Runtime-observable behavior**: observable API footprint modification through lightweight redirection logic.
@@ -64,25 +65,29 @@ The methodology follows a strict five-phase pipeline. Researchers should follow 
 ### Phase 1: Feature Extraction & Sandbox Setup (`miscs/`)
 
 The process begins by preparing the environment and establishing the ground truth.
+
 - **Environment Setup**: The CAPEv2 sandbox is configured with custom BinSim/Stalker instrumentation to ensure deep, evasion-resistant execution tracing.
 - **Data Extraction**: Original malware samples undergo static and dynamic analysis. The results are fused into `.npz` datasets, serving as the baseline for both ML training and functionality verification.
 
 ### Phase 2: Baseline Detection Evaluation (`baseline_detectors/`)
 
 Before any evasion techniques are applied, the original dataset is evaluated to establish baseline detection rates.
+
 - **Machine Learning**: Models (e.g., MalConv) are trained and tested on the extracted `.npz` datasets.
 - **Heuristics**: Raw PE files are bulk-scanned using ClamAV, Windows Defender, and VirusTotal to record their initial detected/bypassed status.
 
 ### Phase 3: Adversarial Sample Generation (`proposed/` & `baseline_adversarial_techniques/`)
 
 Adversarial techniques are employed to mutate the original malware samples into evasive variants.
+
 - **VERITAS (Proposed)**: Our novel approach is executed to generate the primary set of evasive samples for evaluation.
 - **Baselines (Comparators)**: Techniques like GAMMA, AIMED-RL, and MalGPT are executed to generate their respective datasets of adversarial PE files.
-- This phase produces distinct datasets of *adversarial PE files* (one for our proposed method and one for each baseline) that will be pitted against each other in the final evaluation.
+- This phase produces distinct datasets of _adversarial PE files_ (one for our proposed method and one for each baseline) that will be pitted against each other in the final evaluation.
 
 ### Phase 4: Integrity & Functionality Verification (`integrity_functionaltiy_evaluating_codes/`)
 
 A critical, scientifically rigorous step: ensuring the evasive modifications did not destroy the malware's actual malicious behavior.
+
 - **Integrity Checks**: Verifying the new adversarial samples can execute without crashing.
 - **Semantic Verification**: Using Control Flow Graphs (CFG), Symbolic Execution (Z3), and sequence alignment (Smith-Waterman) to compare the adversarial trace against the original Phase 1 trace.
 - **Dataset Filtering**: Samples that fail functionality checks are permanently stripped out. Only structurally sound, functional malware proceeds to the final evaluation.
@@ -90,15 +95,16 @@ A critical, scientifically rigorous step: ensuring the evasive modifications did
 ### Phase 5: Final Result Evaluation (`detector_evaluaion/` & `our_results/`)
 
 The surviving, fully functional adversarial samples undergo a final assessment.
+
 - The functional dataset is re-scanned by the baseline ML and heuristic detectors.
 - Scripts in `detector_evaluaion/` synthesize the data to calculate the ultimate metrics: combining Functionality & Integrity Rates (FIR) with the final Evasion/Bypass Rates.
 - Final aggregated reports are saved in `our_results/`.
 
 ## Note on this Repository
 
-This repository represents a refactored, beautified, and generalized version of the codebase we used during our testing. It is provided for reference and architectural understanding, and may not represent the exact 1-to-1 code executed during all raw experimental runs. 
+This repository represents a refactored, beautified, and generalized version of the codebase we used during our testing. It is provided for reference and architectural understanding, and may not represent the exact 1-to-1 code executed during all raw experimental runs.
 
-The primary purpose of this repository is to showcase and evaluate our proposed technique (`proposed/`). All other adversarial techniques (`baseline_adversarial_techniques/`) and detectors (`baseline_detectors/`) are included strictly as comparators to establish a baseline. 
+The primary purpose of this repository is to showcase and evaluate our proposed technique (`proposed/`). All other adversarial techniques (`baseline_adversarial_techniques/`) and detectors (`baseline_detectors/`) are included strictly as comparators to establish a baseline.
 
 For specific execution instructions, environment setups, and configuration options for any component, please navigate to its respective directory and consult the local `README.md`.
 
@@ -116,3 +122,4 @@ For specific execution instructions, environment setups, and configuration optio
 ## License
 
 This repository is released under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+upstream/main

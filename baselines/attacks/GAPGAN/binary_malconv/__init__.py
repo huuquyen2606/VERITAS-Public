@@ -1,0 +1,431 @@
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+import json
+
+class MalwareModelBase:
+    pass
+
+class ExperimentManager:
+    def __init__(self, base_dir, experiment_name):
+        self.run_dir = os.path.join(base_dir, experiment_name)
+        os.makedirs(self.run_dir, exist_ok=True)
+    def get_path(self, filename):
+        return os.path.join(self.run_dir, filename)
+
+class Logger:
+    def __init__(self, run_dir):
+        self.log_path = os.path.join(run_dir, "training.log")
+        self.file = open(self.log_path, "w")
+    def log(self, msg):
+        print(msg)
+        self.file.write(msg + "\n")
+        self.file.flush()
+    def close(self):
+        self.file.close()
+
+def generate_confusion_matrix(*args, **kwargs): pass
+def calculate_metrics(*args, **kwargs): return {}
+def plot_confidence_distribution(*args, **kwargs): pass
+def save_training_plot(*args, **kwargs): pass
+
+from .arch import MalConv
+
+torch.set_num_threads(12)
+
+
+def unwrap_state_dict(checkpoint):
+    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+        return checkpoint["model_state_dict"]
+    return checkpoint
+
+
+# ==========================================
+# HELPER: DeCov Loss
+# ==========================================
+def decov_loss(features):
+    """
+    Calculates DeCov loss to reduce overfitting.
+    """
+    features_mean = torch.mean(features, dim=0, keepdim=True)
+    features_centered = features - features_mean
+    n = features.size(0)
+
+    if n <= 1:
+        return torch.tensor(0.0, device=features.device)
+
+    corr = (1 / (n - 1)) * torch.matmul(features_centered.t(), features_centered)
+    loss = 0.5 * (
+        torch.norm(corr, p="fro") ** 2 - torch.norm(torch.diag(corr), p=2) ** 2
+    )
+    return loss
+
+
+# ==========================================
+# DATASET (UPDATED FOR .NPZ & AUTO-LABEL)
+# ==========================================
+class BytesDataset(Dataset):
+    def __init__(self, paths, max_len, padding_val):
+        self.max_len = max_len
+        self.padding_val = padding_val
+        self.samples = []  # (filepath, binary_label)
+        self.npz_data = []  # (raw_byte_array, binary_label)
+
+        if isinstance(paths, str):
+            paths = [paths]
+
+        for p in paths:
+            if p.endswith(".npz"):
+                # Load extracted dataset
+                data = np.load(p, allow_pickle=True)
+                labels = data["label"]
+                raw_bytes = data["raw_byte"]
+                self.npz_file = data  # Prevent garbage collection
+
+                for i in range(len(labels)):
+                    # AUTO LABEL LOGIC: "benign" -> 0, anything else -> 1
+                    binary_label = 0 if "benign" in str(labels[i]).lower() else 1
+                    self.npz_data.append((raw_bytes[i], binary_label))
+            else:
+                # Load directory
+                for root, dirs, _ in os.walk(p):
+                    for d in dirs:
+                        # AUTO LABEL LOGIC for folders
+                        binary_label = 0 if "benign" in d.lower() else 1
+                        target_dir = os.path.join(root, d)
+                        for r, _, files in os.walk(target_dir):
+                            for f in files:
+                                if not f.startswith("."):
+                                    self.samples.append(
+                                        (os.path.join(r, f), binary_label)
+                                    )
+
+    def __len__(self):
+        return len(self.samples) + len(self.npz_data)
+
+    def __getitem__(self, idx):
+        if idx < len(self.samples):
+            # Read Physical File
+            path, label = self.samples[idx]
+            try:
+                with open(path, "rb") as f:
+                    content = f.read(self.max_len)
+                byte_arr = np.frombuffer(content, dtype=np.uint8)
+            except:
+                byte_arr = np.array([], dtype=np.uint8)
+        else:
+            # Read from NPZ array
+            npz_idx = idx - len(self.samples)
+            raw_array, label = self.npz_data[npz_idx]
+            byte_arr = np.array(raw_array, dtype=np.uint8)
+
+        # Apply Padding
+        padded = np.ones(self.max_len, dtype=np.int64) * self.padding_val
+        ln = min(len(byte_arr), self.max_len)
+        padded[:ln] = byte_arr[:ln]
+
+        return torch.from_numpy(padded), torch.tensor(label, dtype=torch.long)
+
+
+# ==========================================
+# MAIN CONTROLLER
+# ==========================================
+class BinaryMalConv(MalwareModelBase):
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = None
+        self.model_cfg = {
+            "max_len": 2000000,
+            "channels": 128,
+            "window_size": 500,
+            "embedding_dim": 8,
+        }
+        self.class_names = ["Benign", "Malware"]
+
+        self.train_cfg = {
+            "batch_size": 4,
+            "accum_steps": 64,
+            "epochs": 10,
+            "learning_rate": 0.01,
+            "momentum": 0.9,
+            "num_workers": 4,
+            "padding_byte": 0,
+        }
+
+    def load_weights(self, weights_path):
+        print(f"[*] Loading weights from {weights_path}")
+        ckpt = torch.load(weights_path, map_location=self.device)
+        if isinstance(ckpt, dict):
+            self.model_cfg.update(ckpt.get("model_cfg", {}))
+            self.train_cfg.update(ckpt.get("train_cfg", {}))
+        cfg = self.model_cfg
+        self.model = MalConv(
+            input_length=cfg["max_len"],
+            channels=cfg['channels'],
+            window_size=cfg['window_size'],
+            embedding_dim=cfg['embedding_dim']
+        ).to(self.device)
+        self.model.load_state_dict(unwrap_state_dict(ckpt))
+        self.model.eval()
+
+    def train(
+        self,
+        train_paths,
+        val_paths,
+        label_mapping,
+        experiment_name=None,
+        overrides=None,
+    ):
+        if overrides:
+            self.train_cfg.update(overrides)
+        from tqdm import tqdm
+
+        manager = ExperimentManager(
+            "predic_models", experiment_name=experiment_name or "Binary_MalConv_Run"
+        )
+        logger = Logger(manager.run_dir)
+
+        logger.log("[*] Starting Binary Auto-Label Training")
+        padding_byte = self.train_cfg.get("padding_byte", self.train_cfg.get("padding_char", 0))
+
+        train_loader = DataLoader(
+            BytesDataset(
+                train_paths, self.model_cfg["max_len"], padding_byte
+            ),
+            batch_size=self.train_cfg["batch_size"],
+            shuffle=True,
+            num_workers=self.train_cfg["num_workers"],
+        )
+        val_loader = DataLoader(
+            BytesDataset(
+                val_paths, self.model_cfg["max_len"], padding_byte
+            ),
+            batch_size=self.train_cfg["batch_size"],
+            shuffle=False,
+            num_workers=self.train_cfg["num_workers"],
+        )
+
+        cfg = self.model_cfg
+        self.model = MalConv(
+            input_length=cfg["max_len"],
+            channels=cfg['channels'],
+            window_size=cfg['window_size'],
+            embedding_dim=cfg['embedding_dim']
+        ).to(self.device)
+        optimizer = optim.SGD(
+            self.model.parameters(),
+            lr=self.train_cfg["learning_rate"],
+            momentum=self.train_cfg["momentum"],
+            nesterov=True,
+        )
+        # BCELoss for sigmoid output (paper-strict)
+        criterion = nn.BCELoss()
+
+        best_acc = 0.0
+        accum = self.train_cfg["accum_steps"]
+        decov_lambda = self.train_cfg.get("decov_strength", 0.1)
+
+        history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+
+        for epoch in range(self.train_cfg["epochs"]):
+            self.model.train()
+            optimizer.zero_grad()
+            logger.log(f"\n--- Epoch {epoch + 1} ---")
+
+            loop = tqdm(train_loader, desc="Train")
+            total_loss, correct, total = 0, 0, 0
+
+            for i, (x, y) in enumerate(loop):
+                x, y = x.to(self.device), y.to(self.device)
+                # Convert labels to float for BCELoss
+                # Convention: 0 = Malware, 1 = Benign
+                # But our labels are: 0 = Benign, 1 = Malware
+                # So we flip: benign_prob target = 1 - malware_label
+                y_float = (1 - y).float()
+                out = self.model(x)  # sigmoid prob of benign
+
+                loss = criterion(out, y_float)
+
+                (loss / accum).backward()
+
+                if (i + 1) % accum == 0 or (i + 1) == len(train_loader):
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                total_loss += loss.item()
+                # prob >= 0.5 → benign (label 0), prob < 0.5 → malware (label 1)
+                preds = (out < 0.5).long()
+                correct += (preds == y).sum().item()
+                total += y.size(0)
+
+                loop.set_postfix(loss=f"{loss.item():.4f}")
+
+            train_acc = correct / total
+            val_acc = self._evaluate_loop(val_loader, criterion)
+
+            history["train_loss"].append(total_loss / len(train_loader))
+            history["train_acc"].append(train_acc)
+            history["val_loss"].append(0)  # Simplified for brevity
+            history["val_acc"].append(val_acc)
+
+            logger.log(f"Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+
+            if val_acc > best_acc:
+                best_acc = val_acc
+                torch.save(
+                    {
+                        "model_state_dict": self.model.state_dict(),
+                        "model_cfg": self.model_cfg,
+                        "train_cfg": self.train_cfg,
+                        "format_version": 1,
+                    },
+                    manager.get_path("best_model.pth"),
+                )
+                logger.log("  ✓ Best model saved")
+
+        save_training_plot(history, manager.run_dir)
+        logger.close()
+
+    def _evaluate_loop(self, loader, criterion):
+        self.model.eval()
+        correct, total = 0, 0
+        with torch.no_grad():
+            for x, y in loader:
+                x, y = x.to(self.device), y.to(self.device)
+                out = self.model(x)  # sigmoid prob of benign
+                # prob >= 0.5 → benign (label 0), prob < 0.5 → malware (label 1)
+                preds = (out < 0.5).long()
+                correct += (preds == y).sum().item()
+                total += y.size(0)
+        return correct / total if total > 0 else 0
+
+    def predict(self, input_path) -> dict:
+        if not self.model:
+            raise RuntimeError("Load weights first")
+        from tqdm import tqdm
+        self.model.eval()
+        results = {}
+        maxlen = self.model_cfg["max_len"]
+        pad = self.train_cfg.get("padding_byte", self.train_cfg.get("padding_char", 0))
+
+        # SCENARIO A: NPZ Dataset
+        if input_path.endswith(".npz"):
+            data = np.load(input_path, allow_pickle=True)
+            names = data["name"]
+            raw_bytes = data["raw_byte"]
+
+            with torch.no_grad():
+                for i in tqdm(range(len(names)), desc="Predicting NPZ"):
+                    byte_arr = np.array(raw_bytes[i], dtype=np.uint8)
+                    padded = np.ones(maxlen, dtype=np.int64) * pad
+                    ln = min(len(byte_arr), maxlen)
+                    padded[:ln] = byte_arr[:ln]
+
+                    inp = torch.from_numpy(padded).unsqueeze(0).to(self.device)
+                    benign_prob = self.model(inp).item()  # sigmoid output
+
+                    virus_prob = 1.0 - benign_prob
+                    results[f"{input_path}::{names[i]}"] = {
+                        "Benign": benign_prob,
+                        "Malware": virus_prob,
+                        "final_label": "Malware" if benign_prob < 0.5 else "Benign",
+                    }
+        # SCENARIO B: Dirs/Files
+        else:
+            files = [input_path] if os.path.isfile(input_path) else []
+            if os.path.isdir(input_path):
+                for r, _, fl in os.walk(input_path):
+                    files.extend([os.path.join(r, f) for f in fl])
+
+            with torch.no_grad():
+                for fpath in tqdm(files, desc="Predicting Files"):
+                    try:
+                        with open(fpath, "rb") as f:
+                            content = f.read(maxlen)
+                        byte_arr = np.frombuffer(content, dtype=np.uint8)
+                        padded = np.ones(maxlen, dtype=np.int64) * pad
+                        ln = min(len(byte_arr), maxlen)
+                        padded[:ln] = byte_arr[:ln]
+
+                        inp = torch.from_numpy(padded).unsqueeze(0).to(self.device)
+                        benign_prob = self.model(inp).item()  # sigmoid output
+
+                        virus_prob = 1.0 - benign_prob
+                        results[fpath] = {
+                            "Benign": benign_prob,
+                            "Malware": virus_prob,
+                            "final_label": "Malware" if benign_prob < 0.5 else "Benign",
+                        }
+                    except Exception as e:
+                        results[fpath] = {"final_label": "ERROR", "details": str(e)}
+        return results
+
+    def evaluate(self, test_path, output_dir=None) -> dict:
+        if not self.model:
+            raise RuntimeError("Model not loaded")
+        output_dir = output_dir or "results"
+        os.makedirs(output_dir, exist_ok=True)
+        padding_byte = self.train_cfg.get("padding_byte", self.train_cfg.get("padding_char", 0))
+
+        ds = BytesDataset(
+            test_path, self.model_cfg["max_len"], padding_byte
+        )
+        loader = DataLoader(ds, batch_size=self.train_cfg["batch_size"], shuffle=False)
+
+        y_true, y_pred, confs, correct_mask = [], [], [], []
+
+        self.model.eval()
+        with torch.no_grad():
+            for x, y in tqdm(loader, desc="Evaluating"):
+                x, y = x.to(self.device), y.to(self.device)
+                out = self.model(x)  # sigmoid prob of benign
+
+                # prob >= 0.5 → benign (label 0), prob < 0.5 → malware (label 1)
+                preds = (out < 0.5).long()
+
+                y_true.extend(y.cpu().numpy())
+                y_pred.extend(preds.cpu().numpy())
+
+                # Confidence: max(prob_benign, prob_malware)
+                batch_confs = torch.max(out, 1.0 - out)
+                confs.extend(batch_confs.cpu().numpy())
+                correct_mask.extend((preds == y).cpu().numpy())
+
+        metrics = calculate_metrics(y_true, y_pred, self.class_names)
+        generate_confusion_matrix(y_true, y_pred, self.class_names, output_dir)
+        plot_confidence_distribution(confs, correct_mask, output_dir)
+        return metrics
+
+    def evade(self, technique_paths, label_mapping) -> dict:
+        report = {}
+        for tech_path in technique_paths:
+            tech_name = os.path.basename(tech_path.rstrip("/\\")).replace(
+                "_adv_samples", ""
+            )
+            passed, total = 0, 0
+
+            # Use predict directly which handles both NPZ and Dirs
+            preds = self.predict(tech_path)
+
+            for path_key, res in preds.items():
+                if res.get("final_label") == "ERROR":
+                    continue
+
+                # Auto-label inference based on path/name string
+                true_label = "Benign" if "benign" in path_key.lower() else "Malware"
+
+                total += 1
+                if res.get("final_label") != true_label:
+                    passed += 1
+
+            report[tech_name] = {
+                "passed": passed,
+                "total": total,
+                "rate": (passed / total) if total > 0 else 0,
+            }
+            print(f"[*] Evasion {tech_name}: {passed}/{total} passed")
+
+        return report

@@ -1,0 +1,22 @@
+{
+  "config": {
+    "D": 30000,
+    "T": 80,
+    "F": 200,
+    "TEST_INTERVAL": 1000,
+    "MAX_RATIO": 7.0,
+    "gamma": 0.99,
+    "learning_rate": 0.001,
+    "minibatch_size": 32,
+    "replay_start_size": 1000,
+    "memory_capacity": 500000,
+    "target_update_interval": 100,
+    "seed": 1337,
+    "device": "cpu",
+    "grad_clip_norm": 10.0,
+    "priority_epsilon": 1e-06
+  },
+  "best_sr": 0.8,
+  "steps": 2249750,
+  "history_len": 30000
+}

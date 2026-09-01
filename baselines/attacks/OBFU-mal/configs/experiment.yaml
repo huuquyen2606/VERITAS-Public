@@ -1,0 +1,43 @@
+seed: 123
+
+env:
+  mode: blackbox
+  sample_dir: data/samples
+  output_dir: artifacts/evaded/blackbox
+  max_turns: 5
+  random_sample: true
+  cache_samples: false
+  cache_predictions: true
+  skip_benign: true
+  validate_actions: true
+  isolate_native_actions: true
+  action_apply_timeout_sec: 2.0
+  include_obfuscation: true
+  create_dummy_sample: true
+
+detector:
+  type: lightgbm
+  model_path: LIGHTGBMs/result.txt
+  threshold: 0.9
+  feature_backend: ember
+
+agent:
+  lr: 0.001
+  gamma: 0.99
+  batch_size: 32
+  buffer_size: 1000
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay_steps: 50000
+  target_update_freq: 100
+  hidden_dims: [1024, 256]
+  device: cpu
+
+training:
+  episodes: 0  # 0 = auto-detect from dataset size
+  save_path: artifacts/models/dqn_latest.pt
+  run_dir: artifacts/runs
+
+evaluation:
+  episodes: 0  # 0 = auto-detect from dataset size
+  run_dir: artifacts/runs
