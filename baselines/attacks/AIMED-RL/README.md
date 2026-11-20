@@ -9,7 +9,7 @@ This repository contains the reproduction of the **AIMED-RL** baseline model. It
 ## 1. Overview
 
 - **Observation Space**: 2,351-dimensional PE feature vector extracted via `pefeatures.py` (LIEF/EMBER static PE feature representation).
-- **Action Space**: PE mutation transformations based on OpenAI Gym Malware (Section appending, imports injection, overlay manipulation, header modifications).
+- **Action Space**: 10 discrete PE mutation transformations based on OpenAI Gym Malware (Section appending, imports injection, overlay manipulation, header modifications).
 - **Agent Architecture**: Distributional DQN / Double DQN with Prioritized Experience Replay.
 - **Surrogate Detector**: LightGBM classifier trained on EMBER PE features (`data/lgbm_ember.pkl`, default threshold $\tau = 0.9$).
 

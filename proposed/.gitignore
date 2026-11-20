@@ -10,6 +10,7 @@ func_venv/
 data/**
 !data/**/
 !data/**/.gitkeep
+!data/api_hijacking/**
 
 outputs/**
 !outputs/**/

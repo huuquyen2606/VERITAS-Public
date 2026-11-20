@@ -27,9 +27,6 @@ det_venv/
 venv/
 .venv/
 detector/det_venv/
-detector/**
-!detector/
-!detector/.gitkeep
 detector/MAGIC/.git_backup_nested/
 detector/MAGIC/“Angr
 

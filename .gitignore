@@ -11,8 +11,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
+!**/darkarmour-master/lib/
+!**/darkarmour-master/lib/**
 parts/
 sdist/
 var/
@@ -63,7 +65,13 @@ data/benign_content/*
 **/weights/m_attn_health_multi.pth
 !**/weights/m_attn_health_multi.pth.xz
 
-# Local bibliography and paper files
-bib.bib
+# Ensure baseline source modules in data/ folders are tracked
+!**/AIMED-RL/data/*.py
+!**/OBFU-mal/src/obfumal/actions/data/*.py
+!proposed/data/api_hijacking/*.py
+
+# Paper and bibliography files
+*.bib
 *.pdf
-ANONYMITY_FIX_NOTES.md
+
+

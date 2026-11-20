@@ -1,3 +1,5 @@
+"""Calculate raw and validity-conditioned evasion rates across ML detectors."""
+
 import json
 import re
 import csv
